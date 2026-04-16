@@ -53,7 +53,7 @@ for pt = 1:PatientsNum
     disp("patient: " + ptID);
 
     LFPIEDfile = fullfile(inputFolderName_IEDtrials, [ptID '.LFPIED.mat']);
-    load(LFPIEDfile); %#ok<LOAD>
+    load(LFPIEDfile);
 
     % -------- Post-Onset --------
     IEDtrialsAcross = any(LFPIED.IEDtrialsPostOnset, 1);

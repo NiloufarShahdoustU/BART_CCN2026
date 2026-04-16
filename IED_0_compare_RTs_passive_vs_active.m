@@ -37,7 +37,7 @@ for pt = 1:PatientsNum
     load(fullfile(inputFolderName_IEDtrials, fileList(pt).name));
 
 
-    RT = LFPIED.RTs;           % <-- adjust if your RT variable is named differently
+    RT = LFPIED.RTs;          
     isControl = LFPIED.isControl;
 
     % sanity

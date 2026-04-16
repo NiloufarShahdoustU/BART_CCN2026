@@ -1,0 +1,7 @@
+P-values from Rank Sum Tests:
+P-value (non-IED vs PreOnset1): 0.0005
+P-value (non-IED vs PreOnset2): 0.0826
+P-value (non-IED vs PostOnset): 0.0232
+P-value (non-IED vs PreResponse): 0.0035
+P-value (non-IED vs PostResponse): 0.1738
+P-value (non-IED vs PreOutcome): 0.0026

@@ -1,4 +1,6 @@
-%CCN 2026
+%this is only a helper code, do not use this 
+% this is bullshit
+%use version v2
 % find out the spectogram of IED and non-IED trials:
 % I am using baseWaveERP for finding the spectrograms
 
@@ -6,9 +8,10 @@ clear;
 clc;
 close all;
 %% reading data
-inputFolderName_IEDdata = '\\155.100.91.44\d\Data\Nill\BART\bad_chans_removed_IEDdata_LFPmat_6_chunks';
+inputFolderName_LFPmat = '\\155.100.91.44\d\Data\Nill\BART\bad_chans_removed\LFPmat_bad_chans_removed';
+inputFolderName_IEDdata = '\\155.100.91.44\d\Data\Nill\BART\bad_chans_removed\IEDdata_bad_chans_removed';
 outputFolderName = '\\155.100.91.44\d\Code\Nill\BART\IED\IED_24_IED_non_IED_spectrogram_v1\';
-fileList = dir(fullfile(inputFolderName_IEDdata, '*.LFPIED.mat'));
+fileList = dir(fullfile(inputFolderName_LFPmat, '*.LFPmat.mat'));
 PatientsNum = length(fileList);
 
 %% parameters
@@ -19,8 +22,8 @@ MotherWaveParam = 6;    % the mother wavelet parameter (wavenumber); constant th
 waitc = 0;              % a handle to the qiqi waitbar (usually 0)
 
 %%
-for pt = 1:PatientsNum
-% for pt = 1:1
+% for pt = 1:PatientsNum
+for pt = 1:3
     fileNameParts = strsplit(fileList(pt).name, '.');
     ptID = fileNameParts{1}; 
     disp("patient: " + ptID);
@@ -76,89 +79,63 @@ for pt = 1:PatientsNum
     [wave_nonIED,period_nonIED,scale_nonIED,coi_nonIED] = basewaveERP(AverageLFP_nonIED,Fs, loF, hiF, MotherWaveParam,waitc);
 
 
-
-    % Visualization
-    t = 1:nSignal;
-    % Define your time range and corresponding labels
-    new_ticks = linspace(1, nSignal, 7); % Adjust '7' based on desired number of ticks
-    new_labels = linspace(-2, 4, length(new_ticks)); % Corresponding labels from -2 to 4
+% ===================== VISUALIZATION: IED vs non-IED =====================
     
-    frequency_IED = 1 ./ period_IED;
-    frequency_nonIED = 1 ./ period_nonIED;
+    freq_IED    = 1 ./ period_IED;
+    freq_nonIED = 1 ./ period_nonIED;
     
-    % Compute power in decibels
-    PowerDecibel_IED = abs(10 * log10(wave_IED));
-    PowerDecibel_nonIED = abs(10 * log10(wave_nonIED));
+    Spec_IED    = 10*log10(abs(wave_IED).^2);
+    Spec_nonIED = 10*log10(abs(wave_nonIED).^2);
     
-    % Compute the color axis limits based on both datasets
-    cmin = min([PowerDecibel_IED(:); PowerDecibel_nonIED(:)]);
-    cmax = max([PowerDecibel_IED(:); PowerDecibel_nonIED(:)]);
+    timeVec = 1:size(Spec_IED,2);
     
-    % Visualization
-    figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.9, 0.5], 'Visible', 'off'); 
+    % shared color limits (robust, like Starling code)
+    allVals = [Spec_IED(:); Spec_nonIED(:)];
+    climVals = [prctile(allVals,25), prctile(allVals,100)];
     
-    % IED subplot
+    fig = figure('Visible','off','Position',[100 100 1200 500]);
+    sgtitle(sprintf('%s | IED vs non-IED', ptID), ...
+        'FontWeight','bold','Interpreter','none', 'Visible', 'off');
+    
+    
     subplot(1,2,1)
-    pcolor(t, 1 ./ period_IED, PowerDecibel_IED);
-    set(gca, 'YScale', 'log', 'YDir', 'normal');
-    shading flat;
-    colorbar;
-    xlabel('Time (s)');
-    ylabel('Frequency (Hz)');
-    title('IED');
-    caxis([cmin cmax]); % Set the color axis limits
+    imagesc(timeVec, freq_IED, Spec_IED);
+    set(gca,'YDir','normal','YScale','log')
+    ylim([loF hiF])
+    caxis(climVals)
+    axis square tight
+    title('IED trials')
+    xlabel('Time (samples)')
+    ylabel('Frequency (Hz)')
+    set(gca,'FontSize',10)
     
-    % Set x-axis ticks and labels
-    xticks(new_ticks);
-    xticklabels(arrayfun(@num2str, new_labels, 'UniformOutput', false));
     
-    % Add cone of influence
-    hold on;
-    plot(t, 1 ./ coi_IED, 'w--', 'LineWidth', 2);
-    
-    % Add vertical dashed line at x = 1001
-    xline(1001, '--k', 'LineWidth', 3, 'Color', 'r');
-    
-    hold off;
-    
-    % Non-IED subplot
     subplot(1,2,2)
-    pcolor(t, 1 ./ period_nonIED, PowerDecibel_nonIED);
-    set(gca, 'YScale', 'log', 'YDir', 'normal');
-    shading flat;
-    colorbar;
-    xlabel('Time (s)');
-    ylabel('Frequency (Hz)');
-    title('Non IED');
-    caxis([cmin cmax]); % Set the color axis limits
+    imagesc(timeVec, freq_nonIED, Spec_nonIED);
+    set(gca,'YDir','normal','YScale','log')
+    ylim([loF hiF])
+    caxis(climVals)
+    axis square tight
+    title('Non-IED trials')
+    xlabel('Time (samples)')
+    set(gca,'FontSize',10)
     
-    % Set x-axis ticks and labels
-    xticks(new_ticks);
-    xticklabels(arrayfun(@num2str, new_labels, 'UniformOutput', false));
     
-    % Add cone of influence
-    hold on;
-    plot(t, 1 ./ coi_nonIED, 'w--', 'LineWidth', 2);
+    h = colorbar('southoutside');
+    h.Position = [0.25 0.08 0.5 0.03];
+    h.Label.String = 'Power (dB)';
+    h.FontSize = 10;
     
-    % Add vertical dashed line at x = 1001
-    xline(1001, '--k', 'LineWidth', 3, 'Color', 'r');
+    set(fig,'Renderer','painters');
     
-    hold off;
-    
-    % Set the overall title for the figure
-    sgtitle(['patient = ' char(string(ptID))], 'FontSize', 18, 'FontWeight', 'bold');
-
-
-
+    exportgraphics(fig, ...
+        fullfile(outputFolderName, sprintf('%s_IED_vs_nonIED_scalogram.pdf', ptID)), ...
+        'ContentType','vector', ...
+        'BackgroundColor','none', ...
+        'Resolution',600);
     
 
-    
-    % Save figure
-    set(gcf, 'Units', 'inches');
-    screenposition = get(gcf, 'Position');
-    set(gcf, 'PaperPosition', [0 0 screenposition(3:4)], 'PaperSize', [screenposition(3:4)]);
-    filename = string(ptID) + '_scalogram';
-    saveas(gcf, fullfile(outputFolderName, filename), 'pdf');
+
 
     clear AverageLFP_IED AverageLFP_IED IEDtrials LFPmat AverageLFP_IED AverageLFP_nonIED
     clear wave_IED period_IED scale_IED coi_IED wave_nonIED period_nonIED scale_nonIED coi_nonIED
@@ -168,3 +145,5 @@ end
 
 
 %% debug:
+
+% aaaa = squeeze(IEDdata.IED_timepoints(5,:,:));

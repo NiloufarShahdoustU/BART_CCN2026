@@ -1,0 +1,391 @@
+ % the the final version, mix of 5 and 2
+
+% Author: Nill
+
+
+
+clear;
+clc;
+close all;
+warning('off','all');
+
+
+%%
+
+inputFolderName_IEDdata = '\\155.100.91.44\d\Data\Nill\BART\bad_chans_removed_IEDdata_LFPmat_6_chunks_IED_11_v7';
+outputFolderName = '\\155.100.91.44\d\Code\Nill\BART\IED\IED_19_IEDnonIED_bhvr_analysis\v6\';
+fileList = dir(fullfile(inputFolderName_IEDdata, '*.LFPIED.mat'));
+PatientsNum = length(fileList);
+
+
+
+
+
+PreOnset1 = 1;
+PreOnset2 = 2;
+PostOnset = 3;
+PreResponse = 4;
+PostResponse = 5;
+PreOutcome = 6;
+alpha = 0.05;
+%%
+
+% for 6 time periods for ITs
+
+% these means are over trials 
+nonIEDtrials_bhvr_measure_mean = nan(PatientsNum,1); 
+IEDtrials_bhvr_measure_mean = nan(PatientsNum, 6);
+
+
+
+for pt = 1:PatientsNum
+% for pt = 1:1
+    fileNameParts = strsplit(fileList(pt).name, '.');
+    ptID = fileNameParts{1}; 
+    disp("patient: " + ptID);
+
+    %IED data read
+    IEDdata = [inputFolderName_IEDdata '\' ptID '.LFPIED.mat'];
+    load(IEDdata);
+
+    nChans = length(LFPIED.selectedChans)-1; % removing the last selected chan
+
+
+    RTs = LFPIED.RTs;
+    ITs = LFPIED.ITs;
+    RTsThreshold = 10;
+    OutlierIndices = RTs >= RTsThreshold;
+    RTs = RTs(~OutlierIndices);
+    ITs = ITs(~OutlierIndices);
+    nTrials = length(RTs);
+
+    IEDtrialsPreOnset1 = LFPIED.IEDtrialsPreOnset1(:, ~OutlierIndices);
+    IEDtrialsPreOnset2 = LFPIED.IEDtrialsPreOnset2(:, ~OutlierIndices);
+    IEDtrialsPostOnset = LFPIED.IEDtrialsPostOnset(:, ~OutlierIndices);
+    IEDtrialsPreResponse = LFPIED.IEDtrialsPreResponse(:, ~OutlierIndices);
+    IEDtrialsPostResponse = LFPIED.IEDtrialsPostResponse(:, ~OutlierIndices);
+    IEDtrialsPreOutcome = LFPIED.IEDtrialsPreOutcome(:, ~OutlierIndices);
+
+
+
+
+        % first I need to find the nonIED trials, I mean the trials that did
+    % not have ANY IEDs in ANY timepoints before Response!!! in ANY chans! for this I am going
+    % to sum all the IEDtrials a pairwise sum, then if all the rows of a
+    % colum is 0, that colum (trial) is an nonIED trial! Pay attention I am
+    % not taking into account the 
+
+    allTimePoints = IEDtrialsPostResponse + IEDtrialsPreOutcome ;
+    nonIEDIndices = find(all(allTimePoints == 0, 1));
+   
+
+        % now that I've found nonIED trials I need to have their behavioral
+    % mearue vector: 
+    % for the sake of each patient
+    nonIEDtrials_bhvr_measure = ITs(nonIEDIndices);
+
+    % for the sake of overall patients
+    % I am doing standardized RTs:
+    % the calculated means for each patient are influenced by the number of trials and the 
+    % specific variability of that patient%s RTs. To address this, you can consider z-scoring
+    % or standardizing the RTs for each patient before taking the mean. This ensures that differences
+    % in baseline RTs and variability across patients are accounted for.
+   
+
+
+    % Step 2: Use the z-scored RTs to compute the mean for non-IED trials
+    nonIEDtrials_bhvr_measure_mean(pt) = mean(nonIEDtrials_bhvr_measure); 
+
+
+
+
+    IEDTrials_bhvr_measure_MeanPerChan_PreOnset1 = nan(nChans,1);
+    IEDTrials_bhvr_measure_MeanPerChan_PreOnset2 = nan(nChans,1);
+    IEDTrials_bhvr_measure_MeanPerChan_PostOnset = nan(nChans,1);
+    IEDTrials_bhvr_measure_MeanPerChan_PreResponse = nan(nChans,1);
+    IEDTrials_bhvr_measure_MeanPerChan_PostResponse = nan(nChans,1);
+    IEDTrials_bhvr_measure_MeanPerChan_PreOutcome = nan(nChans,1);
+
+
+    IEDtrialsPreOnset1_only = IEDtrialsPreOnset1.*~IEDtrialsPreOnset2.*~IEDtrialsPostOnset.*~IEDtrialsPreResponse;
+    IEDtrialsPreOnset2_only = IEDtrialsPreOnset2.*~IEDtrialsPreOnset1.*~IEDtrialsPostOnset.*~IEDtrialsPreResponse;
+    IEDtrialsPostOnset_only = IEDtrialsPostOnset.*~IEDtrialsPreOnset1.*~IEDtrialsPreOnset2.*~IEDtrialsPreResponse;
+    IEDtrialsPreResponse_only = IEDtrialsPreResponse.*~IEDtrialsPreOnset1.*~IEDtrialsPreOnset2.*~IEDtrialsPostOnset;
+
+    IEDtrialsPostResponse_only = IEDtrialsPostResponse.*~IEDtrialsPreOutcome;
+    IEDtrialsPreOutcome_only = IEDtrialsPreOutcome.*~IEDtrialsPostResponse;
+
+    
+
+    pVal_PreOnset1 = nan(1,nChans);
+    pVal_PreOnset2 = nan(1,nChans);
+    pVal_PostOnset = nan(1,nChans);
+    pVal_PreResponse = nan(1,nChans);
+    pVal_PostResponse = nan(1,nChans);
+    pVal_PreOutcome = nan(1,nChans);
+
+    NumberofPermutations = 10000;
+
+
+    % stacked behavior measure for ied and non ied trials:
+    
+
+    
+
+    for chz = 1:nChans
+  
+    
+        %PreOnset1
+        IEDTrials_bhvr_measure = IEDtrialsPreOnset1_only(chz,:); 
+         % we are only taking the RTs that are not outliers
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure.*ITs;
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure(IEDTrials_bhvr_measure ~= 0);
+
+
+        if (size(IEDTrials_bhvr_measure)>0)
+            pVal_PreOnset1(chz) = permutationTest(IEDTrials_bhvr_measure, nonIEDtrials_bhvr_measure, NumberofPermutations);
+            if pVal_PreOnset1(chz)<alpha
+                IEDTrials_bhvr_measure_MeanPerChan_PreOnset1(chz) = nanmean(IEDTrials_bhvr_measure);
+            end
+        else
+            pVal_PreOnset1(chz) = NaN;
+        end
+        clear IEDTrials_bhvr_measure 
+
+        %///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+         %PreOnset2
+
+  
+
+        IEDTrials_bhvr_measure = IEDtrialsPreOnset2_only(chz,:); 
+         % we are only taking the ITs that are not outliers
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure.*ITs;
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure(IEDTrials_bhvr_measure ~= 0);
+
+
+        if (size(IEDTrials_bhvr_measure)>0)
+            pVal_PreOnset2(chz) = permutationTest(IEDTrials_bhvr_measure, nonIEDtrials_bhvr_measure, NumberofPermutations);
+            if pVal_PreOnset2(chz)<alpha
+                IEDTrials_bhvr_measure_MeanPerChan_PreOnset2(chz) = nanmean(IEDTrials_bhvr_measure);
+            end
+            else
+            pVal_PreOnset2(chz) = NaN;
+        end
+        clear IEDTrials_bhvr_measure 
+
+
+        %///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            %PostOnset
+
+
+        IEDTrials_bhvr_measure = IEDtrialsPostOnset_only(chz,:); 
+         % we are only taking the ITs that are not outliers
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure.*ITs;
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure(IEDTrials_bhvr_measure ~= 0);
+
+
+
+        if (size(IEDTrials_bhvr_measure)>0)
+            pVal_PostOnset(chz) = permutationTest(IEDTrials_bhvr_measure, nonIEDtrials_bhvr_measure, NumberofPermutations);
+            if pVal_PostOnset(chz)< alpha
+                IEDTrials_bhvr_measure_MeanPerChan_PostOnset(chz) = nanmean(IEDTrials_bhvr_measure);
+            end
+        else
+            pVal_PostOnset(chz) = NaN;
+        end
+        clear IEDTrials_bhvr_measure 
+
+        %///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            %PreResponse
+
+
+        IEDTrials_bhvr_measure = IEDtrialsPreResponse_only(chz,:); 
+         % we are only taking the ITs that are not outliers
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure.*ITs;
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure(IEDTrials_bhvr_measure ~= 0);
+
+
+        if (size(IEDTrials_bhvr_measure)>0)
+            pVal_PreResponse(chz) = permutationTest(IEDTrials_bhvr_measure, nonIEDtrials_bhvr_measure, NumberofPermutations);
+            if pVal_PreResponse(chz)< alpha
+                IEDTrials_bhvr_measure_MeanPerChan_PreResponse(chz) = nanmean(IEDTrials_bhvr_measure);
+            end
+            else
+            pVal_PreResponse(chz) = NaN;
+        end
+        clear IEDTrials_bhvr_measure 
+
+        %///////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+
+            %PostResponse
+
+
+        IEDTrials_bhvr_measure = IEDtrialsPostResponse_only(chz,:); 
+         % we are only taking the ITs that are not outliers
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure.*ITs;
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure(IEDTrials_bhvr_measure ~= 0);
+
+
+        if (size(IEDTrials_bhvr_measure)>0)
+            pVal_PostResponse(chz) = permutationTest(IEDTrials_bhvr_measure, nonIEDtrials_bhvr_measure, NumberofPermutations);
+            if pVal_PostResponse(chz)< alpha
+                IEDTrials_bhvr_measure_MeanPerChan_PostResponse(chz) = nanmean(IEDTrials_bhvr_measure);
+            end
+            else
+            pVal_PostResponse(chz) = NaN;
+        end
+        clear IEDTrials_bhvr_measure 
+
+        %///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+            %PreOutcome
+
+
+        IEDTrials_bhvr_measure = IEDtrialsPreOutcome_only(chz,:); 
+         % we are only taking the ITs that are not outliers
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure.*ITs;
+        IEDTrials_bhvr_measure = IEDTrials_bhvr_measure(IEDTrials_bhvr_measure ~= 0);
+
+
+        if (size(IEDTrials_bhvr_measure)>0)
+            pVal_PreOutcome(chz) = permutationTest(IEDTrials_bhvr_measure, nonIEDtrials_bhvr_measure, NumberofPermutations);
+            if pVal_PreOutcome(chz)< alpha
+                IEDTrials_bhvr_measure_MeanPerChan_PreOutcome(chz) = nanmean(IEDTrials_bhvr_measure);
+            end
+            else
+            pVal_PreOutcome(chz) = NaN;
+        end
+        clear IEDTrials_bhvr_measure 
+
+        %///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+   
+  
+    end % end for chan
+
+
+
+     IEDtrials_bhvr_measure_mean(pt,PreOnset1) = nanmean(IEDTrials_bhvr_measure_MeanPerChan_PreOnset1);
+    IEDtrials_bhvr_measure_mean(pt,PreOnset2) = nanmean(IEDTrials_bhvr_measure_MeanPerChan_PreOnset2);
+     IEDtrials_bhvr_measure_mean(pt,PostOnset) = nanmean(IEDTrials_bhvr_measure_MeanPerChan_PostOnset);
+    IEDtrials_bhvr_measure_mean(pt,PreResponse) = nanmean(IEDTrials_bhvr_measure_MeanPerChan_PreResponse);
+    IEDtrials_bhvr_measure_mean(pt,PostResponse) = nanmean(IEDTrials_bhvr_measure_MeanPerChan_PostResponse);
+    IEDtrials_bhvr_measure_mean(pt,PreOutcome) = nanmean(IEDTrials_bhvr_measure_MeanPerChan_PreOutcome);
+
+
+end
+%%
+
+name = 'IEDtrials_bhvr_measure_mean_ITs';
+save([outputFolderName name '.mat'],'IEDtrials_bhvr_measure_mean');
+%% preprocessing
+
+IEDtrials_bhvr_measure_mean_PreOnset1 = IEDtrials_bhvr_measure_mean(:,PreOnset1);
+IEDtrials_bhvr_measure_mean_PreOnset1 = IEDtrials_bhvr_measure_mean_PreOnset1(~isnan(IEDtrials_bhvr_measure_mean_PreOnset1));
+
+
+IEDtrials_bhvr_measure_mean_PreOnset2 = IEDtrials_bhvr_measure_mean(:,PreOnset2);
+IEDtrials_bhvr_measure_mean_PreOnset2 = IEDtrials_bhvr_measure_mean_PreOnset2(~isnan(IEDtrials_bhvr_measure_mean_PreOnset2));
+
+
+IEDtrials_bhvr_measure_mean_PostOnset = IEDtrials_bhvr_measure_mean(:,PostOnset);
+IEDtrials_bhvr_measure_mean_PostOnset = IEDtrials_bhvr_measure_mean_PostOnset(~isnan(IEDtrials_bhvr_measure_mean_PostOnset));
+
+IEDtrials_bhvr_measure_mean_PreResponse = IEDtrials_bhvr_measure_mean(:,PreResponse);
+IEDtrials_bhvr_measure_mean_PreResponse = IEDtrials_bhvr_measure_mean_PreResponse(~isnan(IEDtrials_bhvr_measure_mean_PreResponse));
+
+IEDtrials_bhvr_measure_mean_PostResponse = IEDtrials_bhvr_measure_mean(:,PostResponse);
+IEDtrials_bhvr_measure_mean_PostResponse = IEDtrials_bhvr_measure_mean_PostResponse(~isnan(IEDtrials_bhvr_measure_mean_PostResponse));
+
+
+IEDtrials_bhvr_measure_mean_PreOutcome = IEDtrials_bhvr_measure_mean(:,PreOutcome);
+IEDtrials_bhvr_measure_mean_PreOutcome = IEDtrials_bhvr_measure_mean_PreOutcome(~isnan(IEDtrials_bhvr_measure_mean_PreOutcome));
+
+
+%%
+
+
+vec1 = nonIEDtrials_bhvr_measure_mean;
+vec2 = IEDtrials_bhvr_measure_mean_PreOnset1;
+vec3 = IEDtrials_bhvr_measure_mean_PreOnset2;
+vec4 = IEDtrials_bhvr_measure_mean_PostOnset;
+vec5 = IEDtrials_bhvr_measure_mean_PreResponse;
+vec6 = IEDtrials_bhvr_measure_mean_PostResponse;
+vec7 = IEDtrials_bhvr_measure_mean_PreOutcome;
+
+
+% Concatenate all vectors into a single column vector and create group identifiers
+allVecs = [vec1; vec2; vec3; vec4; vec5; vec6; vec7];
+group = [ones(length(vec1),1); 2*ones(length(vec2),1); 3*ones(length(vec3),1); 4*ones(length(vec4),1); 5*ones(length(vec5),1); 6*ones(length(vec6),1); 7*ones(length(vec7),1) ];
+
+figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.2, 0.3], 'Visible', 'on'); 
+
+% Plot the boxplot with black color
+boxplotHandle = boxplot(allVecs, group, 'Labels', {'non-IED', 'PreOnset1', 'PreOnset2', 'PostOnset', 'PreResponse', 'PostResponse', 'PreOutcome'}, 'Color', 'k', 'Symbol', '');
+xlabel('non-IED trials vs IED trials', 'FontSize', 14, 'FontWeight', 'bold');
+% ylim([0 5]);
+ylabel('normalized mean IT', 'FontSize', 14, 'FontWeight', 'bold');
+set(gca, 'FontSize', 12, 'FontWeight', 'bold');
+
+% Make box plot lines thicker
+set(findobj(gca, 'Type', 'line'), 'LineWidth', 0.5);
+
+% Overlay jittered data points in gray with smaller marker size
+hold on;
+jitterAmount = 0.1;
+markerSize = 10; % Smaller marker size
+scatter(group + (rand(size(group)) - 0.5) * jitterAmount, allVecs, markerSize, ...
+        'MarkerEdgeColor', [0.5 0.5 0.5], 'jitter', 'on', 'jitterAmount', jitterAmount);
+
+
+% ylimValues = ylim; % Get current y-axis limits
+% line([1.5 1.5], ylimValues, 'Color', 'k', 'LineStyle', '--', 'LineWidth', 1); % Draw dashed line
+
+% Final adjustments and saving the plot
+hold off;
+set(gca, 'box', 'off', 'tickdir', 'out');
+set(gcf, 'Units', 'inches');
+screenposition = get(gcf, 'Position');
+set(gcf, 'PaperPosition', [0 0 screenposition(3:4)], 'PaperSize', [screenposition(3:4)]);
+filename = 'ITs_boxplot';
+saveas(gcf, fullfile(outputFolderName, filename), 'pdf');
+
+
+%% p_val for bhv measures accross patients
+
+
+pValuePreOnset1_acc_pt = ranksum(vec1,vec2);
+pValuePreOnset2_acc_pt = ranksum(vec1,vec3);
+pValuePostOnset_acc_pt = ranksum(vec1,vec4);
+pValuePreResponse_acc_pt = ranksum(vec1,vec5);
+pValuePostResponse_acc_pt = ranksum(vec1,vec6);
+pValuePreOutcome_acc_pt = ranksum(vec1,vec7);
+
+
+% Specify the output file name
+outputFileName = fullfile(outputFolderName, 'ITs_pValues.txt');
+
+% Open the file for writing
+fileID = fopen(outputFileName, 'w');
+
+% Write p-values to the file
+fprintf(fileID, 'P-values from Rank Sum Tests:\n');
+fprintf(fileID, 'P-value (non-IED vs PreOnset1): %.4f\n', pValuePreOnset1_acc_pt);
+fprintf(fileID, 'P-value (non-IED vs PreOnset2): %.4f\n', pValuePreOnset2_acc_pt);
+fprintf(fileID, 'P-value (non-IED vs PostOnset): %.4f\n', pValuePostOnset_acc_pt);
+fprintf(fileID, 'P-value (non-IED vs PreResponse): %.4f\n', pValuePreResponse_acc_pt);
+fprintf(fileID, 'P-value (non-IED vs PostResponse): %.4f\n', pValuePostResponse_acc_pt);
+fprintf(fileID, 'P-value (non-IED vs PreOutcome): %.4f\n', pValuePreOutcome_acc_pt);
+% Close the file
+fclose(fileID);
+
+
+%% debug

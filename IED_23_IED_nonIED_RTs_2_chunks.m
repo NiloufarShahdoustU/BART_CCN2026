@@ -150,9 +150,20 @@ IEDtrials_bhvr_measure_mean_PreResponse = IEDtrials_bhvr_measure_mean_PreRespons
 
 % for RTs only these 2 time periods are important:
 
-vec1 = nonIEDtrials_bhvr_measure_mean;
-vec2 = IEDtrials_bhvr_measure_mean_PostOnset;
-vec3 = IEDtrials_bhvr_measure_mean_PreResponse;
+vec1_full = nonIEDtrials_bhvr_measure_mean(:);
+vec2_full = IEDtrials_bhvr_measure_mean_PostOnset(:);
+vec3_full = IEDtrials_bhvr_measure_mean_PreResponse(:);
+
+% =========================
+% Filter vectors for boxplot
+% =========================
+valid1 = ~isnan(vec1_full) & vec1_full ~= 0;
+valid2 = ~isnan(vec2_full) & vec2_full ~= 0;
+valid3 = ~isnan(vec3_full) & vec3_full ~= 0;
+
+vec1 = vec1_full(valid1);
+vec2 = vec2_full(valid2);
+vec3 = vec3_full(valid3);
 
 % Concatenate all vectors into a single column vector and create group identifiers
 allVecs = [vec1; vec2; vec3];
@@ -161,58 +172,76 @@ group = [ones(length(vec1),1); 2*ones(length(vec2),1); 3*ones(length(vec3),1)];
 % square figure, figsize 4 (inches)
 figure('Units','inches','Position',[1 1 4 4], 'Visible','on', 'Color','w');
 
-% Plot the boxplot (we will recolor elements below)
-boxplot(allVecs, group, 'Labels', {'non-IED', epoch_names{1}, epoch_names{2}}, 'Color', 'k', 'Symbol', '');
+% Plot the boxplot
+boxplot(allVecs, group, ...
+    'Labels', {'non-IED', epoch_names{1}, epoch_names{2}}, ...
+    'Color', 'k', ...
+    'Symbol', '');
+
 xlabel('non-IED trials vs IED trials', 'FontSize', 14, 'FontWeight', 'bold');
 ylabel('mean RT', 'FontSize', 14, 'FontWeight', 'bold');
 set(gca, 'FontSize', 12, 'FontWeight', 'bold');
 
-% Make box plot lines thicker
+% Make box plot lines slightly thicker
 set(findobj(gca, 'Type', 'line'), 'LineWidth', 0.5);
 
-% Recolor boxes/medians for the two epoch groups using your epoch_colors
-% NOTE: MATLAB returns box handles in reverse order.
-hBoxes   = findobj(gca, 'Tag', 'Box');
-hMedians = findobj(gca, 'Tag', 'Median');
-
-% We have 3 groups total: [non-IED, Post-Onset, Pre-Response]
-% hBoxes(1) corresponds to group 3, hBoxes(2) to group 2, hBoxes(3) to group 1 (reverse order)
-if length(hBoxes) >= 3
-    % group 2 (Post-Onset)
-    set(hBoxes(2));
-    % group 3 (Pre-Response)
-    set(hBoxes(1));
-end
-if length(hMedians) >= 3
-    % hMedians are also typically reverse order
-    set(hMedians(2), 'Color');
-    set(hMedians(1), 'Color');
-end
-
-% Overlay jittered data points with requested alpha=0.4 and epoch colors
 hold on;
+
+% =========================
+% Jitter settings
+% =========================
 jitterAmount = 0.12;
 markerSize = 16;
+alpha = 0.4;
+
+% Create jittered x positions for FULL vectors
+x1_full = nan(size(vec1_full));
+x2_full = nan(size(vec2_full));
+x3_full = nan(size(vec3_full));
+
+x1_full(valid1) = 1 + (rand(sum(valid1),1) - 0.5) * jitterAmount;
+x2_full(valid2) = 2 + (rand(sum(valid2),1) - 0.5) * jitterAmount;
+x3_full(valid3) = 3 + (rand(sum(valid3),1) - 0.5) * jitterAmount;
+
+% =========================
+% Very tiny gray lines between same participants
+% =========================
+nParticipants = min([length(vec1_full), length(vec2_full), length(vec3_full)]);
+
+for i = 1:nParticipants
+    xline = [x1_full(i), x2_full(i), x3_full(i)];
+    yline = [vec1_full(i), vec2_full(i), vec3_full(i)];
+
+    validLine = ~isnan(xline) & ~isnan(yline) & yline ~= 0;
+
+    if sum(validLine) >= 2
+        plot(xline(validLine), yline(validLine), ...
+            '-', ...
+            'Color', [0.82 0.82 0.82], ...
+            'LineWidth', 0.25);
+    end
+end
+
+% =========================
+% Overlay jittered data points
+% =========================
 
 % non-IED (gray)
-x1 = 1 + (rand(size(vec1)) - 0.5) * jitterAmount;
-scatter(x1, vec1, markerSize, ...
+scatter(x1_full(valid1), vec1_full(valid1), markerSize, ...
     'filled', ...
     'MarkerFaceColor', [0.55 0.55 0.55], ...
     'MarkerEdgeColor', 'none', ...
     'MarkerFaceAlpha', alpha);
 
 % Post-Onset
-x2 = 2 + (rand(size(vec2)) - 0.5) * jitterAmount;
-scatter(x2, vec2, markerSize, ...
+scatter(x2_full(valid2), vec2_full(valid2), markerSize, ...
     'filled', ...
     'MarkerFaceColor', epoch_colors(1,:), ...
     'MarkerEdgeColor', 'none', ...
     'MarkerFaceAlpha', alpha);
 
 % Pre-Response
-x3 = 3 + (rand(size(vec3)) - 0.5) * jitterAmount;
-scatter(x3, vec3, markerSize, ...
+scatter(x3_full(valid3), vec3_full(valid3), markerSize, ...
     'filled', ...
     'MarkerFaceColor', epoch_colors(2,:), ...
     'MarkerEdgeColor', 'none', ...
@@ -225,6 +254,7 @@ set(gca, 'box', 'off', 'tickdir', 'out');
 % Final adjustments and saving the plot (square 4x4 inches)
 set(gcf, 'PaperUnits','inches');
 set(gcf, 'PaperPosition', [0 0 4 4], 'PaperSize', [4 4]);
+
 filename = 'RTs_boxplot';
 saveas(gcf, fullfile(outputFolderName, filename), 'pdf');
 

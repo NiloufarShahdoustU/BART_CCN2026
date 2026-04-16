@@ -76,7 +76,7 @@ for pt = 1:PatientsNum
         IEDTrials_bhvr_measure(TrialIndx) = BankedTrials(TrialIndx);
         IEDTrials_bhvr_measure = IEDTrials_bhvr_measure(~isnan(IEDTrials_bhvr_measure));
 
-        if (numel(IEDTrials_bhvr_measure) > 0)
+        if (numel(IEDTrials_bhvr_measure) > 0) 
             pVal_PostResponse(chz) = permutationTest(IEDTrials_bhvr_measure, nonIEDtrials_bhvr_measure, NumberofPermutations);
             if pVal_PostResponse(chz) < alpha
                 IEDTrials_bhvr_measure_MeanPerChan_PostResponse(chz) = nanmean(IEDTrials_bhvr_measure);
@@ -116,17 +116,23 @@ end
 name = 'IEDtrials_bhvr_measure_mean_acc_PostResponse_PreOutcome';
 save([outputFolderName name '.mat'],'IEDtrials_bhvr_measure_mean');
 
-IEDtrials_bhvr_measure_mean_PostResponse = IEDtrials_bhvr_measure_mean(:,PostResponse);
-IEDtrials_bhvr_measure_mean_PostResponse = IEDtrials_bhvr_measure_mean_PostResponse(~isnan(IEDtrials_bhvr_measure_mean_PostResponse));
-IEDtrials_bhvr_measure_mean_PostResponse = IEDtrials_bhvr_measure_mean_PostResponse(IEDtrials_bhvr_measure_mean_PostResponse ~= 0);
+% =========================
+% Full participant vectors
+% =========================
+vec1_full = nonIEDtrials_bhvr_measure_mean(:);
+vec2_full = IEDtrials_bhvr_measure_mean(:,PostResponse);
+vec3_full = IEDtrials_bhvr_measure_mean(:,PreOutcome);
 
-IEDtrials_bhvr_measure_mean_PreOutcome = IEDtrials_bhvr_measure_mean(:,PreOutcome);
-IEDtrials_bhvr_measure_mean_PreOutcome = IEDtrials_bhvr_measure_mean_PreOutcome(~isnan(IEDtrials_bhvr_measure_mean_PreOutcome));
-IEDtrials_bhvr_measure_mean_PreOutcome = IEDtrials_bhvr_measure_mean_PreOutcome(IEDtrials_bhvr_measure_mean_PreOutcome ~= 0);
+% =========================
+% Filtered vectors for boxplot
+% =========================
+valid1 = ~isnan(vec1_full) & vec1_full ~= 0;
+valid2 = ~isnan(vec2_full) & vec2_full ~= 0;
+valid3 = ~isnan(vec3_full) & vec3_full ~= 0;
 
-vec1 = nonIEDtrials_bhvr_measure_mean;
-vec2 = IEDtrials_bhvr_measure_mean_PostResponse;
-vec3 = IEDtrials_bhvr_measure_mean_PreOutcome;
+vec1 = vec1_full(valid1);
+vec2 = vec2_full(valid2);
+vec3 = vec3_full(valid3);
 
 allVecs = [vec1; vec2; vec3];
 group = [ones(length(vec1),1); 2*ones(length(vec2),1); 3*ones(length(vec3),1)];
@@ -135,7 +141,7 @@ figSize = 4;
 
 figure( ...
     'Units','inches', ...
-    'Position',[1 1 figSize figSize], ...   
+    'Position',[1 1 figSize figSize], ...
     'Visible','on');
 
 boxplot(allVecs, group, ...
@@ -153,22 +159,51 @@ hold on;
 jitterAmount = 0.1;
 markerSize = 18;
 
-x1 = 1 + (rand(size(vec1)) - 0.5) * jitterAmount;
-scatter(x1, vec1, markerSize, ...
+% =========================
+% Jittered x positions
+% =========================
+x1_full = nan(size(vec1_full));
+x2_full = nan(size(vec2_full));
+x3_full = nan(size(vec3_full));
+
+x1_full(valid1) = 1 + (rand(sum(valid1),1) - 0.5) * jitterAmount;
+x2_full(valid2) = 2 + (rand(sum(valid2),1) - 0.5) * jitterAmount;
+x3_full(valid3) = 3 + (rand(sum(valid3),1) - 0.5) * jitterAmount;
+
+% =========================
+% Connect same participants
+% =========================
+nParticipants = length(vec1_full);
+
+for i = 1:nParticipants
+    xline = [x1_full(i), x2_full(i), x3_full(i)];
+    yline = [vec1_full(i), vec2_full(i), vec3_full(i)];
+
+    validLine = ~isnan(xline) & ~isnan(yline) & yline ~= 0;
+
+    if sum(validLine) >= 2
+        plot(xline(validLine), yline(validLine), ...
+            '-', ...
+            'Color', [0.85 0.85 0.85], ...
+            'LineWidth', 0.25);
+    end
+end
+% =========================
+% Scatter points
+% =========================
+scatter(x1_full(valid1), vec1_full(valid1), markerSize, ...
     'filled', ...
     'MarkerFaceColor', [0.5 0.5 0.5], ...
-        'MarkerFaceAlpha', 0.4, ...
+    'MarkerFaceAlpha', 0.4, ...
     'MarkerEdgeColor', 'none');
 
-x2 = 2 + (rand(size(vec2)) - 0.5) * jitterAmount;
-scatter(x2, vec2, markerSize, ...
+scatter(x2_full(valid2), vec2_full(valid2), markerSize, ...
     'filled', ...
     'MarkerFaceColor', epoch_colors(1,:), ...
     'MarkerFaceAlpha', 0.4, ...
     'MarkerEdgeColor', 'none');
 
-x3 = 3 + (rand(size(vec3)) - 0.5) * jitterAmount;
-scatter(x3, vec3, markerSize, ...
+scatter(x3_full(valid3), vec3_full(valid3), markerSize, ...
     'filled', ...
     'MarkerFaceColor', epoch_colors(2,:), ...
     'MarkerFaceAlpha', 0.4, ...
